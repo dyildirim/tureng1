@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tureng Çeviri Aracı</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 { color: #002B49; margin-bottom: 20px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] {
+            flex: 1; padding: 12px; border: 2px solid #ddd;
+            border-radius: 6px; font-size: 16px; outline: none;
+        }
+        input[type="text"]:focus { border-color: #002B49; }
+        button {
+            padding: 12px 20px; background-color: #002B49; color: white;
+            border: none; border-radius: 6px; font-size: 16px;
+            cursor: pointer; font-weight: bold;
+        }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .result-box {
+            background-color: #f8f9fa; border-left: 5px solid #002B49;
+            padding: 15px; border-radius: 4px; text-align: left;
+            min-height: 40px; display: none; word-wrap: break-word;
+        }
+        .loading { color: #666; font-style: italic; }
+        .error { color: #d9534f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Tureng Sözlük (EN -> TR)</h2>
+    <div class="input-group">
+        <input type="text" id="wordInput" placeholder="İngilizce kelime yazın..." autocomplete="off">
+        <button id="translateBtn">Çevir</button>
+    </div>
+    <div id="resultBox" class="result-box"></div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const inputElement = document.getElementById("wordInput");
+    const resultBox = document.getElementById("resultBox");
+    const button = document.getElementById("translateBtn");
+
+    button.addEventListener("click", translateWord);
+    inputElement.addEventListener("keypress", (e) => { if (e.key === "Enter") translateWord(); });
+
+    function translateWord() {
+        const word = inputElement.value.trim().toLowerCase();
+        if (!word) { alert("Lütfen bir kelime girin!"); return; }
+
+        resultBox.style.display = "block";
+        resultBox.innerHTML = '<span class="loading">Tureng\'de aranıyor...</span>';
+        button.disabled = true;
+
+        const targetUrl = "https://tureng.com/en/turkish-english/" + encodeURIComponent(word);
+        const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(targetUrl);
+
+        fetch(proxyUrl)
+            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+            .then(data => {
+                const htmlText = data.contents;
+                if (htmlText.includes("Did you mean") || !htmlText.includes('table class="table table-hover table-striped"')) {
+                    resultBox.innerHTML = '<span class="error">Kelime bulunamadı.</span>';
+                    return;
+                }
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const elements = doc.querySelectorAll('td.tr.lang-tr a');
+                
+                const meanings = [];
+                elements.forEach(el => {
+                    const text = el.textContent.trim();
+                    if (text && !meanings.includes(text) && meanings.length < 4) {
+                        meanings.push(text);
+                    }
+                });
+
+                if (meanings.length > 0) {
+                    resultBox.innerHTML = "<strong>Anlamları:</strong><br> " + meanings.join(", ");
+                } else {
+                    resultBox.innerHTML = '<span class="error">Çeviri bulunamadı.</span>';
+                }
+            })
+            .catch(() => {
+                resultBox.innerHTML = '<span class="error">Bağlantı hatası oluştu!</span>';
+            })
+            .finally(() => { button.disabled = false; });
+    }
+});
+</script>
+</body>
+</html>
